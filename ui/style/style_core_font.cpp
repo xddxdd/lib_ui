@@ -125,21 +125,22 @@ enum {
 };
 #ifndef DESKTOP_APP_USE_PACKAGED_FONTS
 QString FontTypeFiles[FontTypesCount] = {
-	"DAOpenSansRegular",
-	"DAOpenSansRegularItalic",
-	"DAOpenSansSemiboldAsBold",
-	"DAOpenSansSemiboldItalicAsBold",
-	"DAOpenSansSemiboldAsBold",
-	"DAOpenSansSemiboldItalicAsBold",
+	"GoogleSans-Regular",
+	"GoogleSans-Italic",
+	"GoogleSans-Regular",
+	"GoogleSans-Italic",
+	"GoogleSans-Regular",
+	"GoogleSans-Italic",
 };
 QString FontTypeNames[FontTypesCount] = {
-	"DAOpenSansRegular",
-	"DAOpenSansRegularItalic",
-	"DAOpenSansSemibold",
-	"DAOpenSansSemiboldItalic",
-	"DAOpenSansSemibold",
-	"DAOpenSansSemiboldItalic",
+	"Google Sans",
+	"Google Sans",
+	"Google Sans",
+	"Google Sans",
+	"Google Sans",
+	"Google Sans",
 };
+
 QString FontTypePersianFallbackFiles[FontTypesCount] = {
 	"DAVazirRegular",
 	"DAVazirRegular",
@@ -156,6 +157,7 @@ QString FontTypePersianFallback[FontTypesCount] = {
 	"DAVazirMedium",
 	"DAVazirMedium",
 };
+
 #endif // !DESKTOP_APP_USE_PACKAGED_FONTS
 int32 FontTypeFlags[FontTypesCount] = {
 	0,
@@ -252,7 +254,7 @@ QString GetPossibleEmptyOverride(int32 flags) {
 
 QString GetFontOverride(int32 flags) {
 	const auto result = GetPossibleEmptyOverride(flags);
-	return result.isEmpty() ? "Open Sans" : result;
+	return result.isEmpty() ? "Google Sans" : result;
 }
 
 QString MonospaceFont() {

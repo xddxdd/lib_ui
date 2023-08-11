@@ -17,8 +17,8 @@ namespace style {
 
 inline constexpr auto kScaleAuto = 0;
 inline constexpr auto kScaleMin = 50;
-inline constexpr auto kScaleDefault = 100;
-inline constexpr auto kScaleMax = 300;
+inline constexpr auto kScaleDefault = 110;
+inline constexpr auto kScaleMax = 400;
 inline constexpr auto kScaleAlwaysAllowMax = 200;
 
 [[nodiscard]] int DevicePixelRatio();
