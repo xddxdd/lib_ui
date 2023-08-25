@@ -77,7 +77,7 @@ constexpr auto kMaxDiacAfterSymbol = 2;
 	const auto &font = st.font;
 	return (font->size() * style::DevicePixelRatio() == 13)
 		&& (font->flags() == 0)
-		&& (font->f.family() == qstr("DAOpenSansRegular"));
+		&& (font->f.family() == qstr("Regular"));
 }
 
 } // namespace

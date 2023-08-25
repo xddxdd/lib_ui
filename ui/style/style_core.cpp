@@ -61,7 +61,7 @@ void StopShortAnimation() {
 } // namespace internal
 
 void startManager(int scale) {
-	internal::registerFontFamily("Open Sans");
+	internal::registerFontFamily("Google Sans");
 	internal::startModules(scale);
 }
 

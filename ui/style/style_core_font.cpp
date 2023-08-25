@@ -125,22 +125,21 @@ enum {
 };
 #ifndef DESKTOP_APP_USE_PACKAGED_FONTS
 QString FontTypeFiles[FontTypesCount] = {
-	"GoogleSans-Regular",
-	"GoogleSans-Italic",
-	"GoogleSans-Regular",
-	"GoogleSans-Italic",
-	"GoogleSans-Regular",
-	"GoogleSans-Italic",
+	"Regular",
+	"Italic",
+	"Medium",
+	"MediumItalic",
+	"Medium",
+	"MediumItalic",
 };
 QString FontTypeNames[FontTypesCount] = {
 	"Google Sans",
 	"Google Sans",
-	"Google Sans",
-	"Google Sans",
-	"Google Sans",
-	"Google Sans",
+	"Google Sans Medium",
+	"Google Sans Medium",
+	"Google Sans Medium",
+	"Google Sans Medium",
 };
-
 QString FontTypePersianFallbackFiles[FontTypesCount] = {
 	"DAVazirRegular",
 	"DAVazirRegular",
@@ -157,7 +156,6 @@ QString FontTypePersianFallback[FontTypesCount] = {
 	"DAVazirMedium",
 	"DAVazirMedium",
 };
-
 #endif // !DESKTOP_APP_USE_PACKAGED_FONTS
 int32 FontTypeFlags[FontTypesCount] = {
 	0,
