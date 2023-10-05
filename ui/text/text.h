@@ -203,9 +203,10 @@ public:
 		bool breakEverywhere = false;
 		int reserve = 0;
 	};
+	[[nodiscard]] std::vector<int> countLineWidths(int width) const;
 	[[nodiscard]] std::vector<int> countLineWidths(
 		int width,
-		LineWidthsOptions options = {}) const;
+		LineWidthsOptions options) const;
 
 	struct DimensionsResult {
 		int width = 0;
@@ -217,8 +218,10 @@ public:
 		int reserve = 0;
 	};
 	[[nodiscard]] DimensionsResult countDimensions(
+		GeometryDescriptor geometry) const;
+	[[nodiscard]] DimensionsResult countDimensions(
 		GeometryDescriptor geometry,
-		DimensionsRequest request = {}) const;
+		DimensionsRequest request) const;
 
 	void setText(const style::TextStyle &st, const QString &text, const TextParseOptions &options = kDefaultTextOptions);
 	void setMarkedText(const style::TextStyle &st, const TextWithEntities &textWithEntities, const TextParseOptions &options = kMarkupTextOptions, const std::any &context = {});
