@@ -708,9 +708,7 @@ defaultScrollArea: ScrollArea {
 	barBg: scrollBarBg;
 	barBgOver: scrollBarBgOver;
 
-	round: 2px;
-
-	width: 10px;
+	width: 9px;
 	minHeight: 20px;
 	deltax: 3px;
 	deltat: 3px;
