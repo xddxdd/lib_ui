@@ -734,7 +734,7 @@ defaultSolidScroll: ScrollArea(defaultScrollArea) {
 	hiding: 0;
 }
 
-defaultCheckboxIcon: icon {{ "default_checkbox_check", overviewCheckFgActive, point(4px, 7px) }};
+defaultCheckboxIcon: icon {{ "default_checkbox_check", overviewCheckFgActive, point(4px, 6px) }};
 
 defaultCheck: Check {
 	bg: transparent;
@@ -743,7 +743,7 @@ defaultCheck: Check {
 	diameter: 22px;
 	thickness: 2px;
 	icon: defaultCheckboxIcon;
-	duration: 120;
+	duration: 150;
 	rippleAreaPadding: 8px;
 }
 defaultRadio: Radio {
@@ -754,7 +754,7 @@ defaultRadio: Radio {
 	thickness: 2px;
 	outerSkip: 10px; // * 0.1
 	skip: 60px; // * 0.1
-	duration: 120;
+	duration: 150;
 	rippleAreaPadding: 8px;
 }
 defaultToggle: Toggle {
