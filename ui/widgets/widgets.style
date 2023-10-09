@@ -872,7 +872,7 @@ defaultPopupMenu: PopupMenu {
 
 	radius: 3px;
 	duration: 150;
-	showDuration: 200;
+	showDuration: 250;
 }
 
 defaultInputField: InputField {
@@ -1102,7 +1102,7 @@ defaultInnerDropdown: InnerDropdown {
 	animation: defaultPanelAnimation;
 
 	duration: 150;
-	showDuration: 200;
+	showDuration: 250;
 
 	bg: menuBg;
 	scroll: defaultSolidScroll;

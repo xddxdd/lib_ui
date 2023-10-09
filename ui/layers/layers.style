@@ -32,7 +32,7 @@ Box {
 	shadowIgnoreTopSkip: bool;
 }
 
-boxDuration: 200;
+boxDuration: 250;
 boxRadius: 8px;
 
 boxButtonFont: font(boxFontSize semibold);
