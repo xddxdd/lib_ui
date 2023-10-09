@@ -845,7 +845,7 @@ defaultMenu: Menu {
 	itemFgShortcutOver: windowSubTextFgOver;
 	itemFgShortcutDisabled: menuFgDisabled;
 	itemIconPosition: point(0px, 0px);
-	itemPadding: margins(17px, 8px, 17px, 7px);
+	itemPadding: margins(17px, 8px, 17px, 8px);
 	itemRightSkip: 6px;
 	itemStyle: defaultTextStyle;
 	itemToggle: defaultMenuToggle;
