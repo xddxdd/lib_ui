@@ -980,8 +980,7 @@ defaultMultiSelect: MultiSelect {
 	scroll: ScrollArea(defaultSolidScroll) {
 		deltat: 3px;
 		deltab: 3px;
-		round: 1px;
-		width: 8px;
+		width: 9px;
 		deltax: 3px;
 		hiding: 1000;
 	}
