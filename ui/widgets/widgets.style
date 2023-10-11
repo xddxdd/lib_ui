@@ -677,6 +677,7 @@ defaultActiveButton: RoundButton {
 	width: -34px;
 	height: 34px;
 	padding: margins(0px, 0px, 0px, 0px);
+	radius: 16px;
 
 	textTop: 8px;
 
