@@ -7,12 +7,12 @@
 #pragma once
 
 #include "ui/text/text_entity.h"
-#include "ui/text/text_block.h"
-#include "ui/effects/spoiler_mess.h"
 #include "ui/click_handler.h"
 #include "base/flags.h"
+#include "ui/style/style_core_types.h"
 
-#include <private/qfixed_p.h>
+#include <crl/crl_time.h>
+
 #include <any>
 
 class Painter;
@@ -22,11 +22,19 @@ enum class type : uchar;
 } // namespace anim
 
 namespace style {
+struct TextStyle;
 struct TextPalette;
+struct QuoteStyle;
 } // namespace style
 
 namespace Ui {
+
+class SpoilerMessCached;
+
 extern const QString kQEllipsis;
+
+inline constexpr auto kQFixedMax = (INT_MAX / 256);
+
 } // namespace Ui
 
 struct TextParseOptions {
@@ -68,9 +76,19 @@ static constexpr TextSelection AllTextSelection = { 0, 0xFFFF };
 
 namespace Ui::Text {
 
+class Block;
+class AbstractBlock;
 struct IsolatedEmoji;
 struct OnlyCustomEmoji;
 struct SpoilerData;
+struct QuoteDetails;
+struct ExtendedData;
+
+struct Modification {
+	int position = 0;
+	uint16 skipped = 0;
+	bool added = false;
+};
 
 struct StateRequest {
 	enum class Flag {
@@ -108,15 +126,13 @@ struct StateRequestElided : StateRequest {
 class SpoilerMessCache {
 public:
 	explicit SpoilerMessCache(int capacity);
+	~SpoilerMessCache();
 
 	[[nodiscard]] not_null<SpoilerMessCached*> lookup(QColor color);
 	void reset();
 
 private:
-	struct Entry {
-		SpoilerMessCached mess;
-		QColor color;
-	};
+	struct Entry;
 
 	std::vector<Entry> _cache;
 	const int _capacity = 0;
@@ -135,7 +151,7 @@ struct LineGeometry {
 	bool elided = false;
 };
 struct GeometryDescriptor {
-	Fn<LineGeometry(LineGeometry line, uint16 position)> layout;
+	Fn<LineGeometry(LineGeometry line)> layout;
 	bool breakEverywhere = false;
 };
 
@@ -149,6 +165,34 @@ struct GeometryDescriptor {
 	bool elisionOneLine,
 	bool elisionBreakEverywhere);
 
+struct QuotePaintCache {
+	QImage corners;
+	QColor headerCached;
+	QColor bgCached;
+	QColor outlineCached;
+	QColor iconCached;
+
+	QColor header;
+	QColor bg;
+	QColor outline;
+	QColor icon;
+};
+
+void ValidateQuotePaintCache(
+	QuotePaintCache &cache,
+	const style::QuoteStyle &st);
+
+struct SkipBlockPaintParts {
+	bool skipTop : 1 = false;
+	bool skipBottom : 1 = false;
+};
+void FillQuotePaint(
+	QPainter &p,
+	QRect rect,
+	const QuotePaintCache &cache,
+	const style::QuoteStyle &st,
+	SkipBlockPaintParts parts = {});
+
 struct PaintContext {
 	QPoint position;
 	int outerWidth = 0; // For automatic RTL Ui inversion.
@@ -158,6 +202,8 @@ struct PaintContext {
 	QRect clip;
 
 	const style::TextPalette *palette = nullptr;
+	QuotePaintCache *pre = nullptr;
+	QuotePaintCache *blockquote = nullptr;
 	std::span<SpecialColor> colors;
 	SpoilerMessCache *spoiler = nullptr;
 	crl::time now = 0;
@@ -176,17 +222,17 @@ struct PaintContext {
 
 class String {
 public:
-	String(int32 minResizeWidth = QFIXED_MAX);
+	String(int minResizeWidth = kQFixedMax);
 	String(
 		const style::TextStyle &st,
 		const QString &text,
 		const TextParseOptions &options = kDefaultTextOptions,
-		int32 minResizeWidth = QFIXED_MAX);
+		int minResizeWidth = kQFixedMax);
 	String(
 		const style::TextStyle &st,
 		const TextWithEntities &textWithEntities,
 		const TextParseOptions &options = kMarkupTextOptions,
-		int32 minResizeWidth = QFIXED_MAX,
+		int minResizeWidth = kQFixedMax,
 		const std::any &context = {});
 	String(String &&other);
 	String &operator=(String &&other);
@@ -238,7 +284,7 @@ public:
 	bool removeSkipBlock();
 
 	[[nodiscard]] int maxWidth() const {
-		return _maxWidth.ceil().toInt();
+		return _maxWidth;
 	}
 	[[nodiscard]] int minHeight() const {
 		return _minHeight;
@@ -293,9 +339,7 @@ public:
 	[[nodiscard]] OnlyCustomEmoji toOnlyCustomEmoji() const;
 
 	[[nodiscard]] bool hasNotEmojiAndSpaces() const;
-	[[nodiscard]] const base::flat_map<int, int> &modifications() const {
-		return _modifications;
-	}
+	[[nodiscard]] const std::vector<Modification> &modifications() const;
 
 	[[nodiscard]] const style::TextStyle *style() const {
 		return _st;
@@ -305,63 +349,92 @@ public:
 
 private:
 	using TextBlocks = std::vector<Block>;
-	using TextLinks = QVector<ClickHandlerPtr>;
 
-	class SpoilerDataWrap {
+	class ExtendedWrap : public std::unique_ptr<ExtendedData> {
 	public:
-		SpoilerDataWrap() noexcept;
-		SpoilerDataWrap(SpoilerDataWrap &&other) noexcept;
-		SpoilerDataWrap &operator=(SpoilerDataWrap &&other) noexcept;
+		ExtendedWrap() noexcept;
+		ExtendedWrap(ExtendedWrap &&other) noexcept;
+		ExtendedWrap &operator=(ExtendedWrap &&other) noexcept;
+		~ExtendedWrap();
 
-		std::unique_ptr<SpoilerData> data;
+		ExtendedWrap(
+			std::unique_ptr<ExtendedData> &&other) noexcept;
+		ExtendedWrap &operator=(
+			std::unique_ptr<ExtendedData> &&other) noexcept;
 
 	private:
-		void adjustFrom(const SpoilerDataWrap *other);
+		void adjustFrom(const ExtendedWrap *other);
 
 	};
 
-	uint16 countBlockEnd(const TextBlocks::const_iterator &i, const TextBlocks::const_iterator &e) const;
-	uint16 countBlockLength(const TextBlocks::const_iterator &i, const TextBlocks::const_iterator &e) const;
+	[[nodiscard]] not_null<ExtendedData*> ensureExtended();
+
+	[[nodiscard]] uint16 countBlockEnd(
+		const TextBlocks::const_iterator &i,
+		const TextBlocks::const_iterator &e) const;
+	[[nodiscard]] uint16 countBlockLength(
+		const TextBlocks::const_iterator &i,
+		const TextBlocks::const_iterator &e) const;
+	[[nodiscard]] QuoteDetails *quoteByIndex(int index) const;
+	[[nodiscard]] const style::QuoteStyle &quoteStyle(
+		not_null<QuoteDetails*> quote) const;
+	[[nodiscard]] QMargins quotePadding(QuoteDetails *quote) const;
+	[[nodiscard]] int quoteMinWidth(QuoteDetails *quote) const;
+	[[nodiscard]] const QString &quoteHeaderText(QuoteDetails *quote) const;
+
+	// block must be either nullptr or a pointer to a NewlineBlock.
+	[[nodiscard]] int quoteIndex(const AbstractBlock *block) const;
 
 	// Template method for originalText(), originalTextWithEntities().
-	template <typename AppendPartCallback, typename ClickHandlerStartCallback, typename ClickHandlerFinishCallback, typename FlagsChangeCallback>
-	void enumerateText(TextSelection selection, AppendPartCallback appendPartCallback, ClickHandlerStartCallback clickHandlerStartCallback, ClickHandlerFinishCallback clickHandlerFinishCallback, FlagsChangeCallback flagsChangeCallback) const;
+	template <
+		typename AppendPartCallback,
+		typename ClickHandlerStartCallback,
+		typename ClickHandlerFinishCallback,
+		typename FlagsChangeCallback>
+	void enumerateText(
+		TextSelection selection,
+		AppendPartCallback appendPartCallback,
+		ClickHandlerStartCallback clickHandlerStartCallback,
+		ClickHandlerFinishCallback clickHandlerFinishCallback,
+		FlagsChangeCallback flagsChangeCallback) const;
 
 	// Template method for countWidth(), countHeight(), countLineWidths().
 	// callback(lineWidth, lineHeight) will be called for all lines with:
 	// QFixed lineWidth, int lineHeight
 	template <typename Callback>
-	void enumerateLines(int w, bool breakEverywhere, Callback callback) const;
+	void enumerateLines(
+		int w,
+		bool breakEverywhere,
+		Callback callback) const;
 
-	void recountNaturalSize(bool initial, Qt::LayoutDirection optionsDir = Qt::LayoutDirectionAuto);
+	void insertModifications(int position, int delta);
+	void removeModificationsAfter(int size);
+	void recountNaturalSize(
+		bool initial,
+		Qt::LayoutDirection optionsDir = Qt::LayoutDirectionAuto);
 
-	// clear() deletes all blocks and calls this method
-	// it is also called from move constructor / assignment operator
-	void clearFields();
-
-	TextForMimeData toText(
+	[[nodiscard]] TextForMimeData toText(
 		TextSelection selection,
 		bool composeExpanded,
 		bool composeEntities) const;
 
-	QFixed _minResizeWidth;
-	QFixed _maxWidth = 0;
-	int32 _minHeight = 0;
+	const style::TextStyle *_st = nullptr;
+	QString _text;
+	TextBlocks _blocks;
+	ExtendedWrap _extended;
+
+	int _minResizeWidth = 0;
+	int _maxWidth = 0;
+	int _minHeight = 0;
+	uint16 _startQuoteIndex = 0;
+	bool _startParagraphLTR : 1 = false;
+	bool _startParagraphRTL : 1 = false;
 	bool _hasCustomEmoji : 1 = false;
 	bool _isIsolatedEmoji : 1 = false;
 	bool _isOnlyCustomEmoji : 1 = false;
 	bool _hasNotEmojiAndSpaces : 1 = false;
-
-	QString _text;
-	base::flat_map<int, int> _modifications;
-	const style::TextStyle *_st = nullptr;
-
-	TextBlocks _blocks;
-	TextLinks _links;
-
-	Qt::LayoutDirection _startDirection = Qt::LayoutDirectionAuto;
-
-	SpoilerDataWrap _spoiler;
+	bool _skipBlockAddedNewline : 1 = false;
+	bool _endsWithQuote : 1 = false;
 
 	friend class Parser;
 	friend class Renderer;

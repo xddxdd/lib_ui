@@ -133,10 +133,6 @@ QFixed LineBreakHelper::negativeRightBearing() const {
 	return qAbs(rightBearing);
 }
 
-QString DebugCurrentParsingString, DebugCurrentParsingPart;
-int DebugCurrentParsingFrom = 0;
-int DebugCurrentParsingLength = 0;
-
 void addNextCluster(
 		int &pos,
 		int end,
@@ -392,9 +388,7 @@ style::font WithFlags(
 		|| (fontFlags & FontSemibold)) {
 		result = result->semibold();
 	}
-	if ((flags & TextBlockFlag::Italic)
-		|| (fontFlags & FontItalic)
-		|| (flags & TextBlockFlag::Blockquote)) {
+	if ((flags & TextBlockFlag::Italic) || (fontFlags & FontItalic)) {
 		result = result->italic();
 	}
 	if ((flags & TextBlockFlag::Underline) || (fontFlags & FontUnderline)) {
@@ -407,6 +401,14 @@ style::font WithFlags(
 		result = result->semibold();
 	}
 	return result;
+}
+
+Qt::LayoutDirection UnpackParagraphDirection(bool ltr, bool rtl) {
+	return ltr
+		? Qt::LeftToRight
+		: rtl
+		? Qt::RightToLeft
+		: Qt::LayoutDirectionAuto;
 }
 
 AbstractBlock::AbstractBlock(
@@ -578,10 +580,6 @@ NewlineBlock::NewlineBlock(
 	flags,
 	linkIndex,
 	colorIndex) {
-}
-
-Qt::LayoutDirection NewlineBlock::nextDirection() const {
-	return _nextDirection;
 }
 
 SkipBlock::SkipBlock(

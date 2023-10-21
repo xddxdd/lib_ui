@@ -7,8 +7,11 @@
 #pragma once
 
 #include "ui/text/text.h"
+#include "ui/text/text_block.h"
 
 namespace Ui::Text {
+
+struct QuoteDetails;
 
 class Parser {
 public:
@@ -57,7 +60,7 @@ private:
 	void blockCreated();
 	void createBlock(int32 skipBack = 0);
 	void createNewlineBlock(bool fromOriginalText);
-	void ensureAtNewline();
+	void ensureAtNewline(QuoteDetails quote);
 
 	// Returns true if at least one entity was parsed in the current position.
 	bool checkEntities();
@@ -79,6 +82,8 @@ private:
 		const QString &linkData,
 		QString *outLinkText,
 		EntityLinkShown *outShown);
+
+	void updateModifications(int index, int delta);
 
 	const not_null<String*> _t;
 	const TextWithEntities _source;
@@ -110,6 +115,8 @@ private:
 	uint16 _linkIndex = 0;
 	uint16 _colorIndex = 0;
 	uint16 _monoIndex = 0;
+	uint16 _quoteIndex = 0;
+	int _quoteStartPosition = 0;
 	EmojiPtr _emoji = nullptr; // current emoji, if current word is an emoji, or zero
 	int32 _blockStart = 0; // offset in result, from which current parsed block is started
 	int32 _diacritics = 0; // diacritic chars skipped without good char
