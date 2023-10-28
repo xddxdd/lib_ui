@@ -167,20 +167,14 @@ struct GeometryDescriptor {
 
 struct QuotePaintCache {
 	QImage corners;
-	QImage outline;
-	mutable QImage bottomCorner;
-	mutable QImage bottomRounding;
-
 	QColor headerCached;
 	QColor bgCached;
-	QColor outline1Cached;
-	QColor outline2Cached;
+	QColor outlineCached;
 	QColor iconCached;
 
 	QColor header;
 	QColor bg;
-	QColor outline1;
-	QColor outline2;
+	QColor outline;
 	QColor icon;
 };
 
@@ -189,8 +183,8 @@ void ValidateQuotePaintCache(
 	const style::QuoteStyle &st);
 
 struct SkipBlockPaintParts {
-	uint32 skippedTop : 31 = 0;
-	uint32 skipBottom : 1 = 0;
+	bool skipTop : 1 = false;
+	bool skipBottom : 1 = false;
 };
 void FillQuotePaint(
 	QPainter &p,

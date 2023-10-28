@@ -410,7 +410,6 @@ void Renderer::fillParagraphBg(int paddingBottom) {
 		const auto isTop = (_y != _quoteLineTop);
 		const auto isBottom = (paddingBottom != 0);
 		const auto left = _startLeft + _quoteShift;
-		const auto start = _quoteTop + skip;
 		const auto top = _quoteLineTop + (isTop ? skip : 0);
 		const auto fill = _y + _lineHeight + paddingBottom - top
 			- (isBottom ? skip : 0);
@@ -432,7 +431,7 @@ void Renderer::fillParagraphBg(int paddingBottom) {
 				ValidateQuotePaintCache(*cache, st);
 			}
 			FillQuotePaint(*_p, rect, *cache, st, {
-				.skippedTop = uint32(top - start),
+				.skipTop = !isTop,
 				.skipBottom = !isBottom,
 			});
 		}
@@ -508,7 +507,7 @@ void Renderer::initNextParagraph(
 		_quoteIndex = paragraphIndex;
 		_quote = _t->quoteByIndex(paragraphIndex);
 		_quotePadding = _t->quotePadding(_quote);
-		_quoteTop = _quoteLineTop = _y;
+		_quoteLineTop = _y;
 		_y += _quotePadding.top();
 		_quotePadding.setTop(0);
 		_quoteDirection = _paragraphDirection;
