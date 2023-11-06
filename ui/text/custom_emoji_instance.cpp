@@ -819,6 +819,10 @@ Object::~Object() {
 	unload();
 }
 
+int Object::width() {
+	return st::emojiSize + 2 * st::emojiPadding;
+}
+
 QString Object::entityData() {
 	return _instance->entityData();
 }
@@ -858,10 +862,21 @@ void Object::repaint() {
 	_repaint();
 }
 
-Internal::Internal(QString entityData, QImage image, bool colored)
+Internal::Internal(
+	QString entityData,
+	QImage image,
+	QMargins padding,
+	bool colored)
 : _entityData(std::move(entityData))
 , _image(std::move(image))
+, _padding(padding)
 , _colored(colored) {
+}
+
+int Internal::width() {
+	return _padding.left()
+		+ (_image.width() / _image.devicePixelRatio())
+		+ _padding.right();
 }
 
 QString Internal::entityData() {
@@ -872,7 +887,9 @@ void Internal::paint(QPainter &p, const Context &context) {
 	context.internal.colorized = _colored;
 
 	const auto size = _image.size() / style::DevicePixelRatio();
-	const auto rect = QRect(context.position, size);
+	const auto rect = QRect(
+		context.position + QPoint(_padding.left(), _padding.top()),
+		size);
 	PaintScaledImage(p, rect, { &_image }, context);
 }
 
