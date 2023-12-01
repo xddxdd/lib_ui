@@ -327,7 +327,7 @@ void RoundButton::setFullRadius(bool enabled) {
 }
 
 void RoundButton::resizeToText(const QString &text) {
-	_text = (_transform == TextTransform::ToUpper) ? text.toUpper() : text;
+	_text = text;
 	_textWidth = _st.font->width(_text);
 
 	int innerWidth = contentWidth();
