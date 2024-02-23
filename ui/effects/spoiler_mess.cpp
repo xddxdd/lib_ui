@@ -25,7 +25,7 @@
 namespace Ui {
 namespace {
 
-constexpr auto kVersion = 1;
+constexpr auto kVersion = 2;
 constexpr auto kFramesPerRow = 10;
 constexpr auto kImageSpoilerDarkenAlpha = 32;
 constexpr auto kMaxCacheSize = 5 * 1024 * 1024;
@@ -40,8 +40,8 @@ constexpr auto kAutoPauseTimeout = crl::time(1000);
 		.particleFadeInDuration = crl::time(350),
 		.particleShownDuration = crl::time(200),
 		.particleFadeOutDuration = crl::time(350),
-		.particleSizeMin = style::ConvertScaleExact(2.) * ratio,
-		.particleSizeMax = style::ConvertScaleExact(2.5) * ratio,
+		.particleSizeMin = style::ConvertScaleExact(1.5) * ratio,
+		.particleSizeMax = style::ConvertScaleExact(2.) * ratio,
 		.particleSpeedMin = style::ConvertScaleExact(2.5),
 		.particleSpeedMax = style::ConvertScaleExact(7.5),
 		.particleSpritesCount = 5,
@@ -59,8 +59,8 @@ constexpr auto kAutoPauseTimeout = crl::time(1000);
 		.particleFadeInDuration = crl::time(500),
 		.particleShownDuration = crl::time(0),
 		.particleFadeOutDuration = crl::time(500),
-		.particleSizeMin = style::ConvertScaleExact(2.) * ratio,
-		.particleSizeMax = style::ConvertScaleExact(2.5) * ratio,
+		.particleSizeMin = style::ConvertScaleExact(1.5) * ratio,
+		.particleSizeMax = style::ConvertScaleExact(2.) * ratio,
 		.particleSpeedMin = style::ConvertScaleExact(7.5),
 		.particleSpeedMax = style::ConvertScaleExact(25.),
 		.particleSpritesCount = 5,
@@ -186,7 +186,9 @@ struct Particle {
 	auto hq = PainterHighQualityEnabler(p);
 	p.setPen(Qt::NoPen);
 	p.setBrush(Qt::white);
-	p.drawRoundedRect(1., 1., width, height, radius, radius);
+	QPainterPath path;
+	path.addRoundedRect(1., 1., width, height, radius, radius);
+	p.drawPath(path);
 	p.end();
 	return result;
 }
