@@ -1,11 +1,10 @@
 <RCC>
-    <qresource prefix="/gui/fonts">
-        <file>Regular.ttf</file>
-        <file>Italic.ttf</file>
-        <file>Medium.ttf</file>
-        <file>MediumItalic.ttf</file>
-        <file>DAVazirRegular.ttf</file>
-        <file>DAVazirMediumAsBold.ttf</file>
-        <file>DAVazirMedium.ttf</file>
-    </qresource>
+  <qresource prefix="/gui/fonts">
+    <file>Regular.ttf</file>
+    <file>Italic.ttf</file>
+    <file>Medium.ttf</file>
+    <file>MediumItalic.ttf</file>
+    <file>Vazirmatn-UI-NL-Regular.ttf</file>
+    <file>Vazirmatn-UI-NL-SemiBold.ttf</file>
+  </qresource>
 </RCC>

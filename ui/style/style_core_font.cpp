@@ -56,10 +56,10 @@ namespace {
 
 #ifndef LIB_UI_USE_PACKAGED_FONTS
 const auto FontTypes = std::array{
-	std::make_pair(u"OpenSans-Regular"_q, FontFlags()),
-	std::make_pair(u"OpenSans-Italic"_q, FontItalic),
-	std::make_pair(u"OpenSans-SemiBold"_q, FontSemibold),
-	std::make_pair(u"OpenSans-SemiBoldItalic"_q, FontFlags(FontSemibold | FontItalic)),
+	std::make_pair(u"Regular"_q, FontFlags()),
+	std::make_pair(u"Italic"_q, FontItalic),
+	std::make_pair(u"Medium"_q, FontSemibold),
+	std::make_pair(u"MediumItalic"_q, FontFlags(FontSemibold | FontItalic)),
 };
 const auto PersianFontTypes = std::array{
 	std::make_pair(u"Vazirmatn-UI-NL-Regular"_q, FontFlags()),
@@ -318,7 +318,7 @@ void StartFonts() {
 }
 
 QString GetFontOverride(int32 flags) {
-	return FontOverride.isEmpty() ? u"Open Sans"_q : FontOverride;
+	return FontOverride.isEmpty() ? u"Google Sans"_q : FontOverride;
 }
 
 void destroyFonts() {
