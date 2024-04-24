@@ -743,7 +743,7 @@ defaultCheck: Check {
 	diameter: 22px;
 	thickness: 2px;
 	icon: defaultCheckboxIcon;
-	duration: 150;
+	duration: universalDuration;
 	rippleAreaPadding: 8px;
 }
 defaultRadio: Radio {
@@ -754,7 +754,7 @@ defaultRadio: Radio {
 	thickness: 2px;
 	outerSkip: 10px; // * 0.1
 	skip: 60px; // * 0.1
-	duration: 150;
+	duration: universalDuration;
 	rippleAreaPadding: 8px;
 }
 defaultToggle: Toggle {
@@ -762,7 +762,7 @@ defaultToggle: Toggle {
 	toggledFg: windowBgActive;
 	untoggledBg: windowBg;
 	untoggledFg: checkboxFg;
-	duration: 150;
+	duration: universalDuration;
 	border: 2px;
 	shift: -2px;
 	diameter: 16px;
@@ -1014,6 +1014,7 @@ SettingsSlider {
 	labelStyle: TextStyle;
 	labelFg: color;
 	labelFgActive: color;
+	strictSkip: pixels;
 	duration: int;
 	rippleBottomSkip: pixels;
 	rippleBg: color;
