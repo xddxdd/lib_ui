@@ -56,19 +56,18 @@ namespace {
 
 #ifndef LIB_UI_USE_PACKAGED_FONTS
 const auto FontTypes = std::array{
-	std::make_pair(u"Regular"_q, FontFlags()),
-	std::make_pair(u"Italic"_q, FontItalic),
-	std::make_pair(u"Medium"_q, FontSemibold),
-	std::make_pair(u"MediumItalic"_q, FontFlags(FontSemibold | FontItalic)),
+	u"Regular"_q,
+	u"Italic"_q,
+	u"Medium"_q,
+	u"MediumItalic"_q,
 };
 const auto PersianFontTypes = std::array{
-	std::make_pair(u"Vazirmatn-UI-NL-Regular"_q, FontFlags()),
-	std::make_pair(u"Vazirmatn-UI-NL-SemiBold"_q, FontSemibold),
+	u"Vazirmatn-UI-NL-Regular"_q,
+	u"Vazirmatn-UI-NL-SemiBold"_q,
 };
 #endif // !LIB_UI_USE_PACKAGED_FONTS
 
 bool Started = false;
-QString FontOverride;
 
 QMap<QString, int> fontFamilyMap;
 QVector<QString> fontFamilies;
@@ -78,52 +77,19 @@ uint32 fontKey(int size, uint32 flags, int family) {
 	return (((uint32(family) << 12) | uint32(size)) << 6) | flags;
 }
 
-bool ValidateFont(const QString &familyName, int flags = 0) {
-	QFont checkFont(familyName);
-	checkFont.setWeight(((flags & FontBold) || (flags & FontSemibold))
-		? QFont::DemiBold
-		: QFont::Normal);
-	checkFont.setItalic(flags & FontItalic);
-	checkFont.setUnderline(flags & FontUnderline);
-	checkFont.setStrikeOut(flags & FontStrikeOut);
-	auto realFamily = QFontInfo(checkFont).family();
-	if (!realFamily.trimmed().startsWith(familyName, Qt::CaseInsensitive)) {
-		LOG(("Font Error: could not resolve '%1' font, got '%2'.").arg(familyName, realFamily));
-		return false;
-	}
-
-	auto metrics = QFontMetrics(checkFont);
-	if (!metrics.height()) {
-		LOG(("Font Error: got a zero height in '%1'.").arg(familyName));
-		return false;
-	}
-
-	return true;
-}
-
 #ifndef LIB_UI_USE_PACKAGED_FONTS
-bool LoadCustomFont(const QString &filePath, const QString &familyName, int flags = 0) {
+bool LoadCustomFont(const QString &filePath) {
 	auto regularId = QFontDatabase::addApplicationFont(filePath);
 	if (regularId < 0) {
 		LOG(("Font Error: could not add '%1'.").arg(filePath));
 		return false;
 	}
 
-	const auto found = [&] {
-		for (auto &family : QFontDatabase::applicationFontFamilies(regularId)) {
-			LOG(("Font: from '%1' loaded '%2'").arg(filePath, family));
-			if (family.trimmed().startsWith(familyName, Qt::CaseInsensitive)) {
-				return true;
-			}
-		}
-		return false;
-	}();
-	if (!found) {
-		LOG(("Font Error: could not locate '%1' font in '%2'.").arg(familyName, filePath));
-		return false;
+	for (auto &family : QFontDatabase::applicationFontFamilies(regularId)) {
+		LOG(("Font: from '%1' loaded '%2'").arg(filePath, family));
 	}
 
-	return ValidateFont(familyName, flags);
+	return true;
 }
 #endif // !LIB_UI_USE_PACKAGED_FONTS
 
@@ -173,7 +139,7 @@ bool LoadCustomFont(const QString &filePath, const QString &familyName, int flag
 	constexpr auto kMaxSizeShift = 6;
 
 	const auto family = font.family();
-	const auto basic = GetFontOverride(flags);
+	const auto basic = u"Google Sans"_q;
 	if (family == basic) {
 		return size;
 	}
@@ -203,7 +169,13 @@ bool LoadCustomFont(const QString &filePath, const QString &familyName, int flag
 			const auto nowHeight = metrics.height();
 			const auto nowCap = metrics.capHeight();
 			if (nowHeight > desiredHeight || nowCap > desiredCap) {
-				return (size + shift - 1);
+				const auto heightBetter = (nowHeight - desiredHeight)
+					< (desiredHeight - currentHeight);
+				const auto capBetter = (nowCap - desiredCap)
+					< (desiredCap - currentCap);
+				return (heightBetter && capBetter)
+					? (size + shift)
+					: (size + shift - 1);
 			}
 			currentHeight = nowHeight;
 			currentCap = nowCap;
@@ -217,7 +189,13 @@ bool LoadCustomFont(const QString &filePath, const QString &familyName, int flag
 			const auto nowHeight = metrics.height();
 			const auto nowCap = metrics.capHeight();
 			if (nowHeight < desiredHeight || nowCap < desiredCap) {
-				return (size - shift + 1);
+				const auto heightBetter = (desiredHeight - nowHeight)
+					< (currentHeight - desiredHeight);
+				const auto capBetter = (desiredCap - nowCap)
+					< (currentCap - desiredCap);
+				return (heightBetter && capBetter)
+					? (size - shift)
+					: (size - shift + 1);
 			}
 			currentHeight = nowHeight;
 			currentCap = nowCap;
@@ -241,7 +219,7 @@ bool LoadCustomFont(const QString &filePath, const QString &familyName, int flag
 	} else if (overriden) {
 		result.setFamily(family);
 	} else {
-		result.setFamily(GetFontOverride(flags));
+		result.setFamily("Google Sans"_q);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
 		result.setFeature("ss03", true);
 #endif // Qt >= 6.7.0
@@ -269,37 +247,17 @@ void StartFonts() {
 	style_InitFontsResource();
 
 #ifndef LIB_UI_USE_PACKAGED_FONTS
-	//[[maybe_unused]] auto badFlags = std::optional<int>();
 	const auto base = u":/gui/fonts/"_q;
-	const auto name = u"Open Sans"_q;
-	const auto persianFallback = u"Vazirmatn UI NL"_q;
+	const auto name = u"Google Sans"_q;
 
-	for (const auto &[file, flags] : FontTypes) {
-		if (!LoadCustomFont(base + file + u".ttf"_q, name, flags)) {
-			//badFlags = flags;
-		}
+	for (const auto &file : FontTypes) {
+		LoadCustomFont(base + file + u".ttf"_q);
 	}
 
-	for (const auto &[file, flags] : PersianFontTypes) {
-		LoadCustomFont(base + file + u".ttf"_q, persianFallback, flags);
+	for (const auto &file : PersianFontTypes) {
+		LoadCustomFont(base + file + u".ttf"_q);
 	}
-	QFont::insertSubstitution(name, persianFallback);
-
-#ifdef Q_OS_WIN
-	// Attempt to workaround a strange font bug with Open Sans Semibold not loading.
-	// See https://github.com/telegramdesktop/tdesktop/issues/3276 for details.
-	// Crash happens on "options.maxh / _t->_st->font->height" with "division by zero".
-	// In that place "_t->_st->font" is "semiboldFont" is "font(13 "Open Sans Semibold").
-	//const auto fallback = u"Segoe UI"_q;
-	//if (badFlags && ValidateFont(fallback, *badFlags)) {
-	//	FontOverride = fallback;
-	//	LOG(("Fonts Info: Using '%1' instead of '%2'.").arg(fallback, name));
-	//}
-	// Disable default fallbacks to Segoe UI, see:
-	// https://github.com/telegramdesktop/tdesktop/issues/5368
-	//
-	//QFont::insertSubstitution(name, fallback);
-#endif // Q_OS_WIN
+	QFont::insertSubstitution(name, u"Vazirmatn UI NL"_q);
 
 #ifdef Q_OS_MAC
 	const auto list = QStringList{
@@ -315,10 +273,6 @@ void StartFonts() {
 	auto appFont = QApplication::font();
 	appFont.setStyleStrategy(QFont::PreferQuality);
 	QApplication::setFont(appFont);
-}
-
-QString GetFontOverride(int32 flags) {
-	return FontOverride.isEmpty() ? u"Google Sans"_q : FontOverride;
 }
 
 void destroyFonts() {
