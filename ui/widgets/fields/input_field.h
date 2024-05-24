@@ -6,6 +6,7 @@
 //
 #pragma once
 
+#include "base/flat_set.h"
 #include "base/timer.h"
 #include "ui/emoji_config.h"
 #include "ui/rp_widget.h"
@@ -77,7 +78,10 @@ class CustomEmojiObject : public QObject, public QTextObjectInterface {
 public:
 	using Factory = Fn<std::unique_ptr<Text::CustomEmoji>(QStringView)>;
 
-	CustomEmojiObject(Factory factory, Fn<bool()> paused);
+	CustomEmojiObject(
+		const style::font &font,
+		Factory factory,
+		Fn<bool()> paused);
 	~CustomEmojiObject();
 
 	void *qt_metacast(const char *iid) override;
@@ -97,12 +101,36 @@ public:
 	void clear();
 
 private:
+	const style::font _font;
 	Factory _factory;
 	Fn<bool()> _paused;
 	base::flat_map<uint64, std::unique_ptr<Text::CustomEmoji>> _emoji;
 	crl::time _now = 0;
 	int _skip = 0;
 
+};
+
+struct MarkdownEnabled {
+	base::flat_set<QString> tagsSubset;
+
+	friend inline bool operator==(
+		const MarkdownEnabled &,
+		const MarkdownEnabled &) = default;
+};
+struct MarkdownDisabled {
+	friend inline bool operator==(
+		const MarkdownDisabled &,
+		const MarkdownDisabled &) = default;
+};
+struct MarkdownEnabledState {
+	std::variant<MarkdownDisabled, MarkdownEnabled> data;
+
+	[[nodiscard]] bool disabled() const;
+	[[nodiscard]] bool enabledForTag(QStringView tag) const;
+
+	friend inline bool operator==(
+		const MarkdownEnabledState &,
+		const MarkdownEnabledState &) = default;
 };
 
 class InputField : public RpWidget {
@@ -222,7 +250,8 @@ public:
 
 	void setInstantReplaces(const InstantReplaces &replaces);
 	void setInstantReplacesEnabled(rpl::producer<bool> enabled);
-	void setMarkdownReplacesEnabled(rpl::producer<bool> enabled);
+	void setMarkdownReplacesEnabled(bool enabled);
+	void setMarkdownReplacesEnabled(rpl::producer<MarkdownEnabledState> enabled);
 	void setExtendedContextMenu(rpl::producer<ExtendedContextMenu> value);
 	void commitInstantReplacement(
 		int from,
@@ -264,8 +293,8 @@ public:
 	bool isUndoAvailable() const;
 	bool isRedoAvailable() const;
 
-	bool isMarkdownEnabled() const {
-		return _markdownEnabled;
+	[[nodiscard]] MarkdownEnabledState markdownEnabledState() const {
+		return _markdownEnabledState;
 	}
 
 	using SubmitSettings = InputSubmitSettings;
@@ -495,6 +524,8 @@ private:
 	std::optional<QString> _inputMethodCommit;
 
 	QMargins _additionalMargins;
+	QMargins _customFontMargins;
+	int _placeholderCustomFontSkip = 0;
 
 	bool _forcePlaceholderHidden = false;
 	bool _reverseMarkdownReplacement = false;
@@ -517,7 +548,7 @@ private:
 	std::unique_ptr<CustomEmojiObject> _customEmojiObject;
 
 	SubmitSettings _submitSettings = SubmitSettings::Enter;
-	bool _markdownEnabled = false;
+	MarkdownEnabledState _markdownEnabledState;
 	bool _undoAvailable = false;
 	bool _redoAvailable = false;
 	bool _inDrop = false;
@@ -557,6 +588,7 @@ private:
 	base::unique_qptr<PopupMenu> _contextMenu;
 
 	QTextCharFormat _defaultCharFormat;
+	QTextBlockFormat _defaultBlockFormat;
 
 	rpl::variable<int> _scrollTop;
 
@@ -578,5 +610,7 @@ private:
 void PrepareFormattingOptimization(not_null<QTextDocument*> document);
 
 [[nodiscard]] int FieldCharacterCount(not_null<InputField*> field);
+
+void AddLengthLimitLabel(not_null<InputField*> field, int limit);
 
 } // namespace Ui
