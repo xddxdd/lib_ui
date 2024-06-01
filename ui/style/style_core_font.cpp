@@ -342,7 +342,7 @@ struct Metrics {
 	if (font.bold()) {
 		const auto style = QFontInfo(font).styleName();
 		if (!style.isEmpty() && !style.startsWith(
-				"Semibold",
+				"Medium",
 				Qt::CaseInsensitive)) {
 			font.setBold(true);
 		}
