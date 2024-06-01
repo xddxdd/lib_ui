@@ -63,6 +63,7 @@ const auto &kTagStrikeOut = InputField::kTagStrikeOut;
 const auto &kTagCode = InputField::kTagCode;
 const auto &kTagPre = InputField::kTagPre;
 const auto &kTagBlockquote = InputField::kTagBlockquote;
+const auto &kTagBlockquoteCollapsed = InputField::kTagBlockquoteCollapsed;
 const auto &kTagSpoiler = InputField::kTagSpoiler;
 const auto &kCustomEmojiFormat = InputField::kCustomEmojiFormat;
 const auto &kCustomEmojiId = InputField::kCustomEmojiId;
@@ -736,7 +737,7 @@ QTextCharFormat PrepareTagFormat(
 	auto result = QTextCharFormat();
 	auto font = st.font;
 	auto color = std::optional<style::color>();
-	auto bg = std::optional<style::color>();
+	auto bg = std::optional<QColor>();
 	auto replaceWhat = QString();
 	auto replaceWith = QString();
 	const auto applyOne = [&](QStringView tag) {
@@ -759,14 +760,14 @@ QTextCharFormat PrepareTagFormat(
 			font = font->underline();
 		} else if (tag == kTagStrikeOut) {
 			font = font->strikeout();
-		} else if (tag == kTagBlockquote) {
+		} else if (tag == kTagBlockquote || tag == kTagBlockquoteCollapsed) {
 			color = st::defaultTextPalette.monoFg;
 			font = font->italic();
 		} else if (tag == kTagCode || IsTagPre(tag)) {
 			color = st::defaultTextPalette.monoFg;
 			font = font->monospace();
 		} else if (tag == kTagSpoiler) {
-			bg = st::msgInDateFg;
+			bg = st::msgInDateFg->c;
 		}
 	};
 	for (const auto &tag : TextUtilities::SplitTags(tag)) {
@@ -948,6 +949,7 @@ const QString InputField::kTagCode = u"`"_q;
 const QString InputField::kTagPre = u"```"_q;
 const QString InputField::kTagSpoiler = u"||"_q;
 const QString InputField::kTagBlockquote = u">"_q;
+const QString InputField::kTagBlockquoteCollapsed = u">^"_q;
 const QString InputField::kCustomEmojiTagStart = u"custom-emoji://"_q;
 const int InputField::kCustomEmojiFormat = QTextFormat::UserObject + 1;
 const int InputField::kCustomEmojiId = QTextFormat::UserProperty + 7;
@@ -2444,7 +2446,6 @@ void InputField::documentContentsChanged(
 	if (_correcting) {
 		return;
 	}
-
 	// In case of input method events Qt emits
 	// document content change signals for a whole
 	// text block where the even took place.
@@ -2490,7 +2491,7 @@ void InputField::documentContentsChanged(
 		QTextCursor(document).endEditBlock();
 		handleContentsChanged();
 		const auto added = charsAdded - _emojiSurrogateAmount;
-		_documentContentsChanges.fire({position, charsRemoved, added});
+		_documentContentsChanges.fire({ position, charsRemoved, added });
 		_emojiSurrogateAmount = 0;
 	});
 
@@ -2952,7 +2953,9 @@ void InputField::keyPressEventInner(QKeyEvent *e) {
 #endif // Q_OS_MAC
 	} else {
 		const auto text = e->text();
-		const auto oldPosition = textCursor().position();
+		const auto old = textCursor();
+		const auto oldPosition = old.position();
+		const auto oldSelection = old.hasSelection();
 		const auto oldModifiers = e->modifiers();
 		const auto allowedModifiers = (enter && ctrl)
 			? (~Qt::ControlModifier)
@@ -2963,7 +2966,19 @@ void InputField::keyPressEventInner(QKeyEvent *e) {
 		if (changeModifiers) {
 			e->setModifiers(oldModifiers & allowedModifiers);
 		}
-		_inner->QTextEdit::keyPressEvent(e);
+		if (e == QKeySequence::InsertParagraphSeparator) {
+			// qtbase commit dbb9579566f3accd8aa5fe61db9692991117afd3 introduced
+			// special logic for repeated 'Enter' key presses, which drops the
+			// block format instead of inserting a newline in case the block format
+			// is non-trivial. For custom fonts we use non-trivial block formats
+			// always for the entire QTextEdit, so we revert that logic and simply
+			// insert a newline as it was before Qt 6.X.Y where this was added.
+			textCursor().insertBlock();
+			_inner->ensureCursorVisible();
+			e->accept();
+		} else {
+			_inner->QTextEdit::keyPressEvent(e);
+		}
 		if (changeModifiers) {
 			e->setModifiers(oldModifiers);
 		}
@@ -2976,7 +2991,10 @@ void InputField::keyPressEventInner(QKeyEvent *e) {
 			} else if (e->key() == Qt::Key_PageDown || e->key() == Qt::Key_Down) {
 				cursor.movePosition(QTextCursor::End, e->modifiers().testFlag(Qt::ShiftModifier) ? QTextCursor::KeepAnchor : QTextCursor::MoveAnchor);
 				check = true;
-			} else if (e->key() == Qt::Key_Left || e->key() == Qt::Key_Right || e->key() == Qt::Key_Backspace) {
+			} else if (!oldSelection
+				&& (e->key() == Qt::Key_Left
+					|| e->key() == Qt::Key_Right
+					|| e->key() == Qt::Key_Backspace)) {
 				e->ignore();
 			}
 			if (check) {
@@ -3647,9 +3665,13 @@ void InputField::commitMarkdownLinkEdit(
 	_insertedTags.clear();
 
 	_reverseMarkdownReplacement = false;
+	_correcting = true;
+	cursor.joinPreviousEditBlock();
 	cursor.setCharFormat(_defaultCharFormat);
 	cursor.setBlockFormat(_defaultBlockFormat);
+	cursor.endEditBlock();
 	_inner->setTextCursor(cursor);
+	_correcting = false;
 }
 
 void InputField::toggleSelectionMarkdown(const QString &tag) {
@@ -3693,7 +3715,7 @@ void InputField::toggleSelectionMarkdown(const QString &tag) {
 			: (leftForBlock && rightForBlock)
 			? kTagPre
 			: kTagCode;
-		if (tag == kTagBlockquote) {
+		if (tag == kTagBlockquote || tag == kTagBlockquoteCollapsed) {
 			QTextCursor(document()).beginEditBlock();
 			if (!leftForBlock) {
 				auto copy = textCursor();
