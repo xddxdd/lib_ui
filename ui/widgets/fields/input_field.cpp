@@ -31,16 +31,7 @@
 #include <QtWidgets/QCommonStyle>
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QTextEdit>
-
-#ifdef Q_OS_WIN
-#include <windows.h>
-#include <WinUser.h>
-#elif !defined DESKTOP_APP_DISABLE_X11_INTEGRATION // Q_OS_WIN
-#include "base/platform/linux/base_linux_xcb_utilities.h"
-
-#include <xcb/xcb_keysyms.h>
-#include <xkbcommon/xkbcommon-keysyms.h>
-#endif // !Q_OS_WIN && !DESKTOP_APP_DISABLE_X11_INTEGRATION
+#include <QShortcut>
 
 namespace Ui {
 namespace {
@@ -1011,14 +1002,6 @@ private:
 	}
 	friend class InputField;
 
-#ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
-	base::Platform::XCB::ObjectWithConnection<
-		xcb_key_symbols_t,
-		xcb_key_symbols_alloc,
-		xcb_key_symbols_free
-	> _xcbKeySymbols;
-#endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
-
 };
 
 void InsertEmojiAtCursor(QTextCursor cursor, EmojiPtr emoji) {
@@ -1349,6 +1332,8 @@ InputField::InputField(
 		Integration::Instance().textActionsUpdated();
 	}, lifetime());
 
+	setupMarkdownShortcuts();
+
 	const auto bar = _inner->verticalScrollBar();
 	_scrollTop = bar->value();
 	connect(bar, &QScrollBar::valueChanged, [=] {
@@ -1365,6 +1350,59 @@ InputField::InputField(
 	startBorderAnimation();
 	startPlaceholderAnimation();
 	finishAnimating();
+}
+
+std::vector<InputField::MarkdownAction> InputField::MarkdownActions() {
+	return {
+		{ QKeySequence::Bold, kTagBold },
+		{ QKeySequence::Italic, kTagItalic },
+		{ QKeySequence::Underline, kTagUnderline },
+		{ kStrikeOutSequence, kTagStrikeOut },
+		{ kMonospaceSequence, kTagCode },
+		{ kBlockquoteSequence, kTagBlockquote },
+		{ kSpoilerSequence, kTagSpoiler },
+		{ kClearFormatSequence, QString() },
+		{ kEditLinkSequence, QString(), MarkdownActionType::EditLink },
+	};
+}
+
+void InputField::setupMarkdownShortcuts() {
+	for (const auto &action : MarkdownActions()) {
+		auto shortcut = std::make_unique<QShortcut>(
+			action.sequence,
+			_inner.get(),
+			nullptr,
+			nullptr,
+			Qt::WidgetShortcut);
+		QObject::connect(shortcut.get(), &QShortcut::activated, [=] {
+			executeMarkdownAction(action);
+		});
+		_markdownShortcuts.push_back(std::move(shortcut));
+	}
+}
+
+bool InputField::executeMarkdownAction(MarkdownAction action) {
+	if (_markdownEnabledState.disabled()) {
+		return false;
+	} else if (action.type == MarkdownActionType::EditLink) {
+		if (!_editLinkCallback) {
+			return false;
+		}
+		const auto cursor = textCursor();
+		editMarkdownLink({
+			cursor.selectionStart(),
+			cursor.selectionEnd()
+		});
+	} else if (action.tag.isEmpty()) {
+		clearSelectionMarkdown();
+	} else if (!_markdownEnabledState.enabledForTag(action.tag)
+		|| (action.tag == kTagCode
+			&& !_markdownEnabledState.enabledForTag(kTagPre))) {
+		return false;
+	} else {
+		toggleSelectionMarkdown(action.tag);
+	}
+	return true;
 }
 
 const rpl::variable<int> &InputField::scrollTop() const {
@@ -3026,65 +3064,18 @@ bool InputField::handleMarkdownKey(QKeyEvent *e) {
 	if (_markdownEnabledState.disabled()) {
 		return false;
 	}
-	const auto modifiers = e->modifiers()
-		& ~(Qt::KeypadModifier | Qt::GroupSwitchModifier);
 	const auto matches = [&](const QKeySequence &sequence) {
-		const auto events = QKeySequence(modifiers | e->key());
+		const auto searchKey = (e->modifiers() | e->key())
+			& ~(Qt::KeypadModifier | Qt::GroupSwitchModifier);
+		const auto events = QKeySequence(searchKey);
 		return sequence.matches(events) == QKeySequence::ExactMatch;
 	};
-	const auto matchesCtrlShiftDot = [&] {
-		// We can't match ctrl+shift+. with QKeySequence because
-		// shift+. gives us '>' and ctrl+shift+> is not the same.
-		// So we check with native code instead.
-#ifdef Q_OS_WIN
-		return (modifiers == (Qt::ControlModifier | Qt::ShiftModifier))
-			&& (e->nativeVirtualKey() == VK_OEM_PERIOD);
-#elif !defined DESKTOP_APP_DISABLE_X11_INTEGRATION // Q_OS_WIN
-		if (!_inner->_xcbKeySymbols) {
-			return false;
+	for (const auto &action : MarkdownActions()) {
+		if (matches(action.sequence)) {
+			return executeMarkdownAction(action);
 		}
-		const auto keysym = xcb_key_symbols_get_keysym(
-			_inner->_xcbKeySymbols.get(),
-			e->nativeScanCode(),
-			0);
-		return (modifiers == (Qt::ControlModifier | Qt::ShiftModifier))
-			&& (keysym == XKB_KEY_period);
-#else // !Q_OS_WIN && !DESKTOP_APP_DISABLE_X11_INTEGRATION
-		return false;
-#endif // !Q_OS_WIN && DESKTOP_APP_DISABLE_X11_INTEGRATION
-	};
-	const auto enabled = [&](QStringView tag) {
-		return _markdownEnabledState.enabledForTag(tag);
-	};
-	if (enabled(kTagBold) && e == QKeySequence::Bold) {
-		toggleSelectionMarkdown(kTagBold);
-	} else if (enabled(kTagItalic) && e == QKeySequence::Italic) {
-		toggleSelectionMarkdown(kTagItalic);
-	} else if (enabled(kTagUnderline) && e == QKeySequence::Underline) {
-		toggleSelectionMarkdown(kTagUnderline);
-	} else if (enabled(kTagStrikeOut) && matches(kStrikeOutSequence)) {
-		toggleSelectionMarkdown(kTagStrikeOut);
-	} else if (enabled(kTagCode)
-		&& enabled(kTagPre)
-		&& matches(kMonospaceSequence)) {
-		toggleSelectionMarkdown(kTagCode);
-	} else if (enabled(kTagBlockquote)
-		&& (matches(kBlockquoteSequence) || matchesCtrlShiftDot())) {
-		toggleSelectionMarkdown(kTagBlockquote);
-	}  else if (enabled(kTagSpoiler) && matches(kSpoilerSequence)) {
-		toggleSelectionMarkdown(kTagSpoiler);
-	} else if (matches(kClearFormatSequence)) {
-		clearSelectionMarkdown();
-	} else if (_editLinkCallback && matches(kEditLinkSequence)) {
-		const auto cursor = textCursor();
-		editMarkdownLink({
-			cursor.selectionStart(),
-			cursor.selectionEnd()
-		});
-	} else {
-		return false;
 	}
-	return true;
+	return false;
 }
 
 auto InputField::selectionEditLinkData(EditLinkSelection selection) const

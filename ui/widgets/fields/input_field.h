@@ -19,6 +19,7 @@
 #include <rpl/variable.h>
 
 class QMenu;
+class QShortcut;
 class QTextEdit;
 class QTouchEvent;
 class QContextMenuEvent;
@@ -374,6 +375,15 @@ protected:
 private:
 	class Inner;
 	friend class Inner;
+	enum class MarkdownActionType {
+		ToggleTag,
+		EditLink,
+	};
+	struct MarkdownAction {
+		QKeySequence sequence;
+		QString tag;
+		MarkdownActionType type = MarkdownActionType::ToggleTag;
+	};
 
 	void handleContentsChanged();
 	bool viewportEventInner(QEvent *e);
@@ -382,6 +392,10 @@ private:
 	void updatePalette();
 	void refreshPlaceholder(const QString &text);
 	int placeholderSkipWidth() const;
+
+	[[nodiscard]] static std::vector<MarkdownAction> MarkdownActions();
+	void setupMarkdownShortcuts();
+	bool executeMarkdownAction(MarkdownAction action);
 
 	bool heightAutoupdated();
 	void checkContentHeight();
@@ -598,6 +612,8 @@ private:
 
 	rpl::event_stream<DocumentChangeInfo> _documentContentsChanges;
 	rpl::event_stream<MarkdownTag> _markdownTagApplies;
+
+	std::vector<std::unique_ptr<QShortcut>> _markdownShortcuts;
 
 	rpl::event_stream<bool> _focusedChanges;
 	rpl::event_stream<> _heightChanges;
