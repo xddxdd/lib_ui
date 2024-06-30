@@ -48,8 +48,8 @@ static const auto kXCBFrameExtentsAtomName = u"_GTK_FRAME_EXTENTS"_q;
 
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 std::optional<bool> XCBWindowMapped(xcb_window_t window) {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return std::nullopt;
 	}
 
@@ -68,8 +68,8 @@ std::optional<bool> XCBWindowMapped(xcb_window_t window) {
 }
 
 std::optional<bool> XCBWindowHidden(xcb_window_t window) {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return std::nullopt;
 	}
 
@@ -81,7 +81,7 @@ std::optional<bool> XCBWindowHidden(xcb_window_t window) {
 		connection,
 		"_NET_WM_STATE_HIDDEN");
 
-	if (!stateAtom.has_value() || !stateHiddenAtom.has_value()) {
+	if (!stateAtom || !stateHiddenAtom) {
 		return std::nullopt;
 	}
 
@@ -89,7 +89,7 @@ std::optional<bool> XCBWindowHidden(xcb_window_t window) {
 		connection,
 		false,
 		window,
-		*stateAtom,
+		stateAtom,
 		XCB_ATOM_ATOM,
 		0,
 		1024);
@@ -115,12 +115,12 @@ std::optional<bool> XCBWindowHidden(xcb_window_t window) {
 		atomsStart,
 		atomsStart + reply->length);
 
-	return ranges::contains(states, *stateHiddenAtom);
+	return ranges::contains(states, stateHiddenAtom);
 }
 
 QRect XCBWindowGeometry(xcb_window_t window) {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return {};
 	}
 
@@ -139,13 +139,13 @@ QRect XCBWindowGeometry(xcb_window_t window) {
 }
 
 std::optional<uint> XCBCurrentWorkspace() {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return std::nullopt;
 	}
 
 	const auto root = base::Platform::XCB::GetRootWindow(connection);
-	if (!root.has_value()) {
+	if (!root) {
 		return std::nullopt;
 	}
 
@@ -153,15 +153,15 @@ std::optional<uint> XCBCurrentWorkspace() {
 		connection,
 		"_NET_CURRENT_DESKTOP");
 
-	if (!currentDesktopAtom.has_value()) {
+	if (!currentDesktopAtom) {
 		return std::nullopt;
 	}
 
 	const auto cookie = xcb_get_property(
 		connection,
 		false,
-		*root,
-		*currentDesktopAtom,
+		root,
+		currentDesktopAtom,
 		XCB_ATOM_CARDINAL,
 		0,
 		1024);
@@ -183,8 +183,8 @@ std::optional<uint> XCBCurrentWorkspace() {
 }
 
 std::optional<uint> XCBWindowWorkspace(xcb_window_t window) {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return std::nullopt;
 	}
 
@@ -192,7 +192,7 @@ std::optional<uint> XCBWindowWorkspace(xcb_window_t window) {
 		connection,
 		"_NET_WM_DESKTOP");
 
-	if (!desktopAtom.has_value()) {
+	if (!desktopAtom) {
 		return std::nullopt;
 	}
 
@@ -200,7 +200,7 @@ std::optional<uint> XCBWindowWorkspace(xcb_window_t window) {
 		connection,
 		false,
 		window,
-		*desktopAtom,
+		desktopAtom,
 		XCB_ATOM_CARDINAL,
 		0,
 		1024);
@@ -225,15 +225,15 @@ std::optional<bool> XCBIsOverlapped(
 		not_null<QWidget*> widget,
 		const QRect &rect) {
 	const auto window = widget->winId();
-	Expects(window != XCB_WINDOW_NONE);
+	Expects(window != XCB_NONE);
 
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return std::nullopt;
 	}
 
 	const auto root = base::Platform::XCB::GetRootWindow(connection);
-	if (!root.has_value()) {
+	if (!root) {
 		return std::nullopt;
 	}
 
@@ -257,7 +257,7 @@ std::optional<bool> XCBIsOverlapped(
 			+ windowGeometry.topLeft(),
 		rect.size() * widget->windowHandle()->devicePixelRatio());
 
-	const auto cookie = xcb_query_tree(connection, *root);
+	const auto cookie = xcb_query_tree(connection, root);
 	const auto reply = base::Platform::XCB::MakeReplyPointer(
 		xcb_query_tree_reply(connection, cookie, nullptr));
 
@@ -308,8 +308,8 @@ std::optional<bool> XCBIsOverlapped(
 }
 
 void SetXCBFrameExtents(not_null<QWidget*> widget, const QMargins &extents) {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return;
 	}
 
@@ -317,7 +317,18 @@ void SetXCBFrameExtents(not_null<QWidget*> widget, const QMargins &extents) {
 		connection,
 		kXCBFrameExtentsAtomName);
 
-	if (!frameExtentsAtom.has_value()) {
+	if (!frameExtentsAtom) {
+		return;
+	}
+
+	if (extents.isNull()) {
+		free(
+			xcb_request_check(
+				connection,
+				xcb_delete_property_checked(
+					connection,
+					widget->winId(),
+					frameExtentsAtom)));
 		return;
 	}
 
@@ -331,45 +342,28 @@ void SetXCBFrameExtents(not_null<QWidget*> widget, const QMargins &extents) {
 		uint(nativeExtents.bottom()),
 	};
 
-	xcb_change_property(
-		connection,
-		XCB_PROP_MODE_REPLACE,
-		widget->winId(),
-		*frameExtentsAtom,
-		XCB_ATOM_CARDINAL,
-		32,
-		extentsVector.size(),
-		extentsVector.data());
-}
-
-void UnsetXCBFrameExtents(not_null<QWidget*> widget) {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
-		return;
-	}
-
-	const auto frameExtentsAtom = base::Platform::XCB::GetAtom(
-		connection,
-		kXCBFrameExtentsAtomName);
-
-	if (!frameExtentsAtom.has_value()) {
-		return;
-	}
-
-	xcb_delete_property(
-		connection,
-		widget->winId(),
-		*frameExtentsAtom);
+	free(
+		xcb_request_check(
+			connection,
+			xcb_change_property_checked(
+				connection,
+				XCB_PROP_MODE_REPLACE,
+				widget->winId(),
+				frameExtentsAtom,
+				XCB_ATOM_CARDINAL,
+				32,
+				extentsVector.size(),
+				extentsVector.data())));
 }
 
 void ShowXCBWindowMenu(not_null<QWidget*> widget, const QPoint &point) {
-	const auto connection = base::Platform::XCB::GetConnectionFromQt();
-	if (!connection) {
+	const base::Platform::XCB::Connection connection;
+	if (!connection || xcb_connection_has_error(connection)) {
 		return;
 	}
 
 	const auto root = base::Platform::XCB::GetRootWindow(connection);
-	if (!root.has_value()) {
+	if (!root) {
 		return;
 	}
 
@@ -377,7 +371,7 @@ void ShowXCBWindowMenu(not_null<QWidget*> widget, const QPoint &point) {
 		connection,
 		"_GTK_SHOW_WINDOW_MENU");
 
-	if (!showWindowMenuAtom.has_value()) {
+	if (!showWindowMenuAtom) {
 		return;
 	}
 
@@ -392,7 +386,7 @@ void ShowXCBWindowMenu(not_null<QWidget*> widget, const QPoint &point) {
 
 	xcb_client_message_event_t xev;
 	xev.response_type = XCB_CLIENT_MESSAGE;
-	xev.type = *showWindowMenuAtom;
+	xev.type = showWindowMenuAtom;
 	xev.sequence = 0;
 	xev.window = widget->winId();
 	xev.format = 32;
@@ -402,18 +396,25 @@ void ShowXCBWindowMenu(not_null<QWidget*> widget, const QPoint &point) {
 	xev.data.data32[3] = 0;
 	xev.data.data32[4] = 0;
 
-	xcb_ungrab_pointer(connection, XCB_CURRENT_TIME);
-	xcb_send_event(
-		connection,
-		false,
-		*root,
-		XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
-			| XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY,
-		reinterpret_cast<const char*>(&xev));
+	free(
+		xcb_request_check(
+			connection,
+			xcb_ungrab_pointer_checked(connection, XCB_CURRENT_TIME)));
+
+	free(
+		xcb_request_check(
+			connection,
+			xcb_send_event_checked(
+				connection,
+				false,
+				root,
+				XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT
+					| XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY,
+				reinterpret_cast<const char*>(&xev))));
 }
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#if defined QT_FEATURE_wayland && QT_CONFIG(wayland)
 void ShowWaylandWindowMenu(not_null<QWidget*> widget, const QPoint &point) {
 	static const auto wl_proxy_marshal_array = [] {
 		void (*result)(
@@ -459,7 +460,7 @@ void ShowWaylandWindowMenu(not_null<QWidget*> widget, const QPoint &point) {
 			wl_argument{ .i = point.y() },
 		}.data());
 }
-#endif // Qt >= 6.5.0
+#endif // wayland
 
 } // namespace
 
@@ -474,8 +475,8 @@ bool TranslucentWindowsSupported() {
 
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 	if (::Platform::IsX11()) {
-		const auto connection = base::Platform::XCB::GetConnectionFromQt();
-		if (!connection) {
+		const base::Platform::XCB::Connection connection;
+		if (!connection || xcb_connection_has_error(connection)) {
 			return false;
 		}
 
@@ -487,7 +488,7 @@ bool TranslucentWindowsSupported() {
 			return false;
 		}
 
-		const auto cookie = xcb_get_selection_owner(connection, *atom);
+		const auto cookie = xcb_get_selection_owner(connection, atom);
 
 		const auto result = base::Platform::XCB::MakeReplyPointer(
 			xcb_get_selection_owner_reply(
@@ -512,10 +513,20 @@ void IgnoreAllActivation(not_null<QWidget*> widget) {
 void ClearTransientParent(not_null<QWidget*> widget) {
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 	if (::Platform::IsX11()) {
-		xcb_delete_property(
-			base::Platform::XCB::GetConnectionFromQt(),
-			widget->winId(),
-			XCB_ATOM_WM_TRANSIENT_FOR);
+		const base::Platform::XCB::Connection connection;
+		if (!connection || xcb_connection_has_error(connection)) {
+			return;
+		}
+
+		free(
+			xcb_request_check(
+				connection,
+				xcb_delete_property_checked(
+					connection,
+					widget->winId(),
+					XCB_ATOM_WM_TRANSIENT_FOR)));
+
+		return;
 	}
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 }
@@ -533,7 +544,7 @@ std::optional<bool> IsOverlapped(
 }
 
 bool WindowMarginsSupported() {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#if defined QT_FEATURE_wayland && QT_CONFIG(wayland)
 	static const auto WaylandResult = [] {
 		using namespace QNativeInterface::Private;
 		QWindow window;
@@ -544,13 +555,13 @@ bool WindowMarginsSupported() {
 	if (WaylandResult) {
 		return true;
 	}
-#endif // Qt >= 6.5.0
+#endif // wayland
 
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 	namespace XCB = base::Platform::XCB;
 	if (::Platform::IsX11()
 		&& XCB::IsSupportedByWM(
-			XCB::GetConnectionFromQt(),
+			XCB::Connection(),
 			kXCBFrameExtentsAtomName)) {
 		return true;
 	}
@@ -560,7 +571,7 @@ bool WindowMarginsSupported() {
 }
 
 void SetWindowMargins(not_null<QWidget*> widget, const QMargins &margins) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#if defined QT_FEATURE_wayland && QT_CONFIG(wayland)
 	using namespace QNativeInterface::Private;
 	const auto window = not_null(widget->windowHandle());
 	const auto platformWindow = not_null(window->handle());
@@ -571,7 +582,7 @@ void SetWindowMargins(not_null<QWidget*> widget, const QMargins &margins) {
 				/ platformWindow->devicePixelRatio());
 		return;
 	}
-#endif // Qt >= 6.5.0
+#endif // wayland
 
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 	if (::Platform::IsX11()) {
@@ -581,31 +592,13 @@ void SetWindowMargins(not_null<QWidget*> widget, const QMargins &margins) {
 #endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
 }
 
-void UnsetWindowMargins(not_null<QWidget*> widget) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
-	using namespace QNativeInterface::Private;
-	if (const auto native = not_null(widget->windowHandle())
-			->nativeInterface<QWaylandWindow>()) {
-		native->setCustomMargins(QMargins());
-		return;
-	}
-#endif // Qt >= 6.5.0
-
-#ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
-	if (::Platform::IsX11()) {
-		UnsetXCBFrameExtents(widget);
-		return;
-	}
-#endif // !DESKTOP_APP_DISABLE_X11_INTEGRATION
-}
-
 void ShowWindowMenu(not_null<QWidget*> widget, const QPoint &point) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+#if defined QT_FEATURE_wayland && QT_CONFIG(wayland)
 	if (::Platform::IsWayland()) {
 		ShowWaylandWindowMenu(widget, point);
 		return;
 	}
-#endif // Qt >= 6.5.0
+#endif // wayland
 
 #ifndef DESKTOP_APP_DISABLE_X11_INTEGRATION
 	if (::Platform::IsX11()) {

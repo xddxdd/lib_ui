@@ -23,9 +23,9 @@ Integration *IntegrationInstance = nullptr;
 void Integration::Set(not_null<Integration*> instance) {
 	IntegrationInstance = instance;
 
-	if constexpr (Platform::IsWindows()) {
-		GL::ConfigureANGLE();
-	}
+#ifdef DESKTOP_APP_USE_ANGLE
+	GL::ConfigureANGLE();
+#endif
 }
 
 Integration &Integration::Instance() {
@@ -68,7 +68,7 @@ std::shared_ptr<ClickHandler> Integration::createLinkHandler(
 }
 
 std::unique_ptr<Text::CustomEmoji> Integration::createCustomEmoji(
-		const QString &data,
+		QStringView data,
 		const std::any &context) {
 	return nullptr;
 }
