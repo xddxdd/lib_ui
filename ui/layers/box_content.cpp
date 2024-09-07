@@ -14,6 +14,8 @@
 #include "ui/text/text_utilities.h"
 #include "ui/rect_part.h"
 #include "ui/painter.h"
+#include "ui/qt_weak_factory.h"
+#include "ui/ui_utility.h"
 #include "base/timer.h"
 #include "styles/style_layers.h"
 #include "styles/palette.h"
@@ -256,10 +258,6 @@ void BoxContent::scrollToWidget(not_null<QWidget*> widget) {
 	if (_scroll) {
 		_scroll->scrollToWidget(widget);
 	}
-}
-
-RectParts BoxContent::customCornersFilling() {
-	return {};
 }
 
 void BoxContent::scrollToY(int top, int bottom) {

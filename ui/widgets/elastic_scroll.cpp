@@ -8,6 +8,7 @@
 
 #include "ui/painter.h"
 #include "ui/ui_utility.h"
+#include "ui/qt_weak_factory.h"
 #include "base/platform/base_platform_info.h"
 #include "base/qt/qt_common_adapters.h"
 #include "styles/style_widgets.h"
@@ -48,23 +49,6 @@ constexpr auto kLogB = 10.;
 	//const auto result = pow(value, 1. / kOverscrollPower);
 
 	return result * scale;
-}
-
-[[nodiscard]] int OverscrollFromAccumulated(int accumulated) {
-	if (!accumulated) {
-		return 0;
-	}
-
-	return (accumulated > 0 ? 1. : -1.)
-		* int(base::SafeRound(RawFrom(std::abs(accumulated))));
-}
-
-[[nodiscard]] int OverscrollToAccumulated(int overscroll) {
-	if (!overscroll) {
-		return 0;
-	}
-	return (overscroll > 0 ? 1. : -1.)
-		* int(base::SafeRound(RawTo(std::abs(overscroll))));
 }
 
 } // namespace
@@ -1290,11 +1274,28 @@ rpl::producer<ElasticScrollMovement> ElasticScroll::movementValue() const {
 	return _movement.value();
 }
 
-QPoint ScrollDelta(not_null<QWheelEvent*> e, bool touch) {
-	const auto convert = [](QPoint point) {
-		return QPoint(
-			style::ConvertScale(point.x()),
-			style::ConvertScale(point.y()));
+int OverscrollFromAccumulated(int accumulated) {
+	if (!accumulated) {
+		return 0;
+	}
+
+	return (accumulated > 0 ? 1. : -1.)
+		* int(base::SafeRound(RawFrom(std::abs(accumulated))));
+}
+
+int OverscrollToAccumulated(int overscroll) {
+	if (!overscroll) {
+		return 0;
+	}
+	return (overscroll > 0 ? 1. : -1.)
+		* int(base::SafeRound(RawTo(std::abs(overscroll))));
+}
+
+QPointF ScrollDeltaF(not_null<QWheelEvent*> e, bool touch) {
+	const auto convert = [](QPointF point) {
+		return QPointF(
+			style::ConvertScaleExact(point.x()),
+			style::ConvertScaleExact(point.y()));
 	};
 	if (!e->pixelDelta().isNull()) {
 		return convert(e->pixelDelta())
@@ -1303,7 +1304,11 @@ QPoint ScrollDelta(not_null<QWheelEvent*> e, bool touch) {
 				: 1.);
 	}
 	return (convert(e->angleDelta()) * QApplication::wheelScrollLines())
-		/ (kPixelToAngleDelta * kDefaultWheelScrollLines);
+		/ float64(kPixelToAngleDelta * kDefaultWheelScrollLines);
+}
+
+QPoint ScrollDelta(not_null<QWheelEvent*> e, bool touch) {
+	return ScrollDeltaF(e, touch).toPoint();
 }
 
 } // namespace Ui
