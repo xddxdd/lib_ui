@@ -240,14 +240,8 @@ void WindowHelper::setNativeFrame(bool enabled) {
 		}
 	}
 	_title->setVisible(!enabled);
-	if (enabled || ::Platform::IsWindows11OrGreater()) {
-		_shadow.reset();
-	} else {
-		_shadow.emplace(window(), st::windowShadowFg->c);
-		_shadow->setResizeEnabled(!fixedSize());
-		initialShadowUpdate();
-	}
 	if (_handle) {
+		updateShadow();
 		updateCornersRounding();
 		updateMargins();
 		updateWindowFrameColors();
@@ -267,10 +261,13 @@ void WindowHelper::setNativeFrame(bool enabled) {
 	}
 }
 
-void WindowHelper::initialShadowUpdate() {
-	if (!_shadow) {
+void WindowHelper::updateShadow() {
+	if (!_handle || _title->isHidden() || nativeResize()) {
+		_shadow.reset();
 		return;
 	}
+	_shadow.emplace(window(), st::windowShadowFg->c);
+	_shadow->setResizeEnabled(!fixedSize());
 	using Change = WindowShadow::Change;
 	const auto noShadowStates = (Qt::WindowMinimized | Qt::WindowMaximized);
 	if ((window()->windowState() & noShadowStates) || window()->isHidden()) {
@@ -307,7 +304,7 @@ void WindowHelper::setFixedSize(QSize size) {
 }
 
 void WindowHelper::setGeometry(QRect rect) {
-	SetGeometryWithPossibleScreenChange(
+	SetGeometryAndScreen(
 		window(),
 		rect.marginsAdded({ 0, titleHeight(), 0, 0 }));
 }
@@ -372,7 +369,7 @@ void WindowHelper::init() {
 				? GetDpiForWindow(_handle)
 				: 0;
 			updateWindowFrameColors();
-			initialShadowUpdate();
+			updateShadow();
 			updateCornersRounding();
 			updateMargins();
 			if (window()->isHidden()) {
@@ -405,30 +402,9 @@ void WindowHelper::init() {
 			size.height() - (titleShown ? titleHeight : 0));
 	}, _body->lifetime());
 
-	hitTestRequests(
-	) | rpl::filter([=](not_null<HitTestRequest*> request) {
-		return ::Platform::IsWindows11OrGreater();
-	}) | rpl::start_with_next([=](not_null<HitTestRequest*> request) {
-		request->result = [=] {
-			const auto maximized = window()->isMaximized()
-				|| window()->isFullScreen();
-			const auto px = int(std::ceil(
-				st::windowTitleHeight
-					* window()->windowHandle()->devicePixelRatio()
-					/ 10.));
-			return (!maximized && (request->point.y() < px))
-				? HitTestResult::Top
-				: HitTestResult::Client;
-		}();
-	}, window()->lifetime());
-
 	_dpi.value() | rpl::start_with_next([=](uint dpi) {
 		updateMargins();
 	}, window()->lifetime());
-
-	if (!::Platform::IsWindows11OrGreater()) {
-		_shadow.emplace(window(), st::windowShadowFg->c);
-	}
 
 	if (_handle && !::Platform::IsWindows8OrGreater()) {
 		SetWindowTheme(_handle, L" ", L" ");
@@ -513,8 +489,7 @@ bool WindowHelper::filterNativeEvent(
 			return GetWindowPlacement(_handle, &wp)
 				&& (wp.showCmd == SW_SHOWMAXIMIZED);
 		}();
-		const auto addBorders = maximized
-			|| ::Platform::IsWindows11OrGreater();
+		const auto addBorders = maximized || nativeResize();
 		if (addBorders) {
 			const auto dpi = _dpi.current();
 			const auto borderWidth = (GetSystemMetricsForDpiSupported() && dpi)
@@ -663,6 +638,15 @@ bool WindowHelper::filterNativeEvent(
 			if (!window()->rect().contains(mapped)) {
 				return DefWindowProc(_handle, msg, wParam, lParam);
 			}
+			const auto maximized = window()->isMaximized()
+				|| window()->isFullScreen();
+			const auto px = int(std::ceil(
+				st::windowTitleHeight
+					* window()->windowHandle()->devicePixelRatio()
+					/ 10.));
+			if (nativeResize() && !maximized && (mapped.y() < px)) {
+				return HTTOP;
+			}
 			auto request = HitTestRequest{
 				.point = mapped,
 			};
@@ -790,6 +774,22 @@ int WindowHelper::titleHeight() const {
 	return _title->isHidden() ? 0 : _title->height();
 }
 
+bool WindowHelper::nativeResize() const {
+	Expects(window()->windowHandle() != nullptr);
+
+	if (::Platform::IsWindows11OrGreater()) {
+		switch (window()->windowHandle()->surfaceType()) {
+		case QSurface::RasterSurface:
+		case QSurface::RasterGLSurface:
+			return window()->windowHandle()->format().alphaBufferSize() <= 0;
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 void WindowHelper::updateWindowFrameColors() {
 	updateWindowFrameColors(window()->isActiveWindow());
 }
@@ -865,7 +865,7 @@ void WindowHelper::updateMargins() {
 	} else {
 		AdjustWindowRectEx(&r, style, false, styleEx);
 	}
-	auto margins = ::Platform::IsWindows11OrGreater()
+	auto margins = nativeResize()
 		? QMargins(0, r.top, 0, 0)
 		: QMargins(r.left, r.top, -r.right, -r.bottom);
 	if (style & WS_MAXIMIZE) {
@@ -956,19 +956,6 @@ HWND GetCurrentHandle(not_null<QWidget*> widget) {
 
 HWND GetCurrentHandle(not_null<QWindow*> window) {
 	return reinterpret_cast<HWND>(window->winId());
-}
-
-void SendWMPaintForce(not_null<QWidget*> widget) {
-	const auto toplevel = widget->window();
-	if (const auto window = toplevel->windowHandle()) {
-		SendWMPaintForce(window);
-	}
-}
-
-void SendWMPaintForce(not_null<QWindow*> window) {
-	if (const auto handle = GetCurrentHandle(window)) {
-		::InvalidateRect(handle, nullptr, FALSE);
-	}
 }
 
 std::unique_ptr<BasicWindowHelper> CreateSpecialWindowHelper(
